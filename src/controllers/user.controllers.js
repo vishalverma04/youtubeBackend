@@ -3,7 +3,21 @@ import { asyncHander } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/Apiresponse.js";
-import {stringify} from "flatted"
+
+const generateAccessAnsdRefreshTokan=async (userId)=>{
+   try {
+      const user=await User.findById(userId)
+      const accesTokan=user.generateAccessToken()
+      const refreshTokan=user.generateRefreshToken()
+
+      user.refreshToken=refreshTokan;
+      await user.save({validateBeforeSave:false})
+
+      return {accesTokan,refreshTokan}
+   } catch (error) {
+      throw new Apierror(500,"something went wrong while generating access and refresh tokan")
+   }
+}
 
 const registerUser= asyncHander(async (req,res)=>{
 
@@ -74,4 +88,79 @@ const registerUser= asyncHander(async (req,res)=>{
 
 })
 
-export {registerUser}
+const loginUser=asyncHander(async (req,res)=>{
+  // take data from req.body
+  // check empty credentials
+  // find user from username or email
+  // check user is exists
+  // check password
+  // generate access ans refresh token 
+  // send cookies
+
+  //take data from req.body
+  const {username,email,password}=req.body
+ 
+  //check empty credentials
+  if(!username || !email){
+   throw new Apierror(400,"username or email required")
+  }
+  
+  //find user
+  const user=await User.findOne({
+   $or:[{username},{email}]
+  })
+
+  if(!user){
+   throw new Apierror(404,"user does not exits")
+  }
+
+  //check password
+  const isPasswordValid=await user.isPasswordCorrect(password)
+
+  if(!isPasswordValid){
+   throw new Apierror(404,"invalid password")
+  }
+
+  //generate access ans refresh tokan
+   const {accesTokan,refreshTokan}=await generateAccessAnsdRefreshTokan(user._id)
+
+   const loggedInUser=await User.findById(user._id).select(
+      "-password -refreshTokan"
+   )
+   const options={
+      httpOnly:true,
+      secure:true
+   }
+   //send response
+   res.status(200)
+   .cookie("accessTokan",accesTokan,options)
+   .cookie("refreshTokan",refreshTokan,options)
+   .json(
+      new ApiResponse(200,{user:loggedInUser,accesTokan,refreshTokan},"user succesfully logged in")
+   )
+
+})
+
+const logoutUser=asyncHander(async (req,res)=>{
+ await User.findByIdAndUpdate(req.user._id,{
+   $set:{
+      refreshTokan:undefined
+   }
+ },
+ {new:true}
+ )
+ 
+ const options={
+   httpOnly:true,
+   secure:true
+}
+ 
+res.status(200)
+.clearCookie("accessTokan",options)
+.clearCookie("accessTokan",options)
+.json(new ApiResponse(200,{},"User logged Out"))
+
+})
+
+
+export {registerUser,loginUser,logoutUser}
