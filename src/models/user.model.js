@@ -41,7 +41,7 @@ const userSchema=new Schema(
             type:String,
             required:[true,"password is required"]
         },
-        generateRefreshToken:{
+        refreshToken:{
             type:String
         }
     },{timestamps:true}
@@ -71,7 +71,7 @@ userSchema.methods.generateAccessToken=function(){
         }
     )
 }
-userSchema.methods.generateRefreshToken=function(){
+userSchema.methods.generateRefreshTokens=function(){
     return  jwt.sign(
         {
             _id:this._id,

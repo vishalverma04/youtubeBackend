@@ -8,7 +8,7 @@ const generateAccessAnsdRefreshTokan=async (userId)=>{
    try {
       const user=await User.findById(userId)
       const accesTokan=user.generateAccessToken()
-      const refreshTokan=user.generateRefreshToken()
+      const refreshTokan=user.generateRefreshTokens()
 
       user.refreshToken=refreshTokan;
       await user.save({validateBeforeSave:false})
@@ -101,7 +101,7 @@ const loginUser=asyncHander(async (req,res)=>{
   const {username,email,password}=req.body
  
   //check empty credentials
-  if(!username || !email){
+  if(!username && !email){
    throw new Apierror(400,"username or email required")
   }
   
@@ -109,7 +109,7 @@ const loginUser=asyncHander(async (req,res)=>{
   const user=await User.findOne({
    $or:[{username},{email}]
   })
-
+  
   if(!user){
    throw new Apierror(404,"user does not exits")
   }
@@ -142,6 +142,7 @@ const loginUser=asyncHander(async (req,res)=>{
 })
 
 const logoutUser=asyncHander(async (req,res)=>{
+
  await User.findByIdAndUpdate(req.user._id,{
    $set:{
       refreshTokan:undefined
@@ -157,7 +158,7 @@ const logoutUser=asyncHander(async (req,res)=>{
  
 res.status(200)
 .clearCookie("accessTokan",options)
-.clearCookie("accessTokan",options)
+.clearCookie("refreshTokan",options)
 .json(new ApiResponse(200,{},"User logged Out"))
 
 })
