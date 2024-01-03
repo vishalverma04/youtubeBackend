@@ -3,6 +3,7 @@ import { asyncHander } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/Apiresponse.js";
+import jwt from "jsonwebtoken";
 
 const generateAccessAnsdRefreshTokan=async (userId)=>{
    try {
@@ -163,5 +164,34 @@ res.status(200)
 
 })
 
+const refreshAccessToken=asyncHander(async (req,res)=>{
+   try {
+      const incommingRefreshToken=req.cookies.refreshTokan || req.body.refreshTokan;
+      if(!incommingRefreshToken){
+         throw new Apierror(401,"Unauthorised tokan")
+      }
+      const decodedInfo=jwt.verify(incommingRefreshToken,process.env.REFRESH_TOKEN_SECRET)
+      const user=await User.findById(decodedInfo?._id);
+      if(!user){
+         throw new Apierror(401,"Invalid tokan")
+      }
+      if(incommingRefreshToken !==user?.refreshTokan){
+         throw new Apierror(402,"Tokan is expired or used")
+      }
+      const options={
+         httpOnly:true,
+         secure:true
+      }
+      const {accesTokan,newRefreshTokan}=await generateAccessAnsdRefreshTokan(user._id)
+      return res.status(201)
+      .cookie("accessToken",accesTokan,options)
+      .cookie("refreshTokan",newRefreshTokan,options)
+      .json(new ApiResponse(200,{accesTokan,refreshTokan:newRefreshTokan},"Access tokan refreshed"))
+   
+   } catch (error) {
+      throw new Apierror(401,error?.message||"invalid refresh tokan")
+   }
+})
 
-export {registerUser,loginUser,logoutUser}
+
+export {registerUser,loginUser,logoutUser,refreshAccessToken}
