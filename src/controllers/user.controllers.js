@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/Apiresponse.js";
 import jwt from "jsonwebtoken";
+import { response } from "express";
 
 const generateAccessAnsdRefreshTokan=async (userId)=>{
    try {
@@ -193,5 +194,77 @@ const refreshAccessToken=asyncHander(async (req,res)=>{
    }
 })
 
+const changeCurrentPassword=asyncHander(async(req,res)=>{
+   const {oldPassword,newPassword}= req.body
 
-export {registerUser,loginUser,logoutUser,refreshAccessToken}
+   const user=await User.findById(req.user?._id)
+
+   const isValidPassword=await user.isPasswordCorrect(oldPassword)
+   if(!isValidPassword){
+      throw new Apierror(404,"old Password is incorrect")
+   }
+   user.password=newPassword
+   await user.save({validateBeforeSave:false})
+
+   return res.status(200)
+   .json(new ApiResponse(200,{},"password changed successfully"))
+})
+
+const getCurrentUser=asyncHander(async(req,res)=>{
+   return res.status(200)
+   .json(200,req.user,"current user fetched successfully")
+})
+
+const updateAccountDetails=asyncHander(async(req,res)=>{
+   const {fullName,email}=req.body
+
+   if(!fullName || !email){
+      throw new Apierror(402,"All fields are required")
+   }
+   const user=User.findByIdAndUpdate(req.user?._id,
+     {
+       $set:{
+         fullName,
+         email
+       }
+     },{new :true} 
+      ).select("-password")
+
+      res.status(200)
+      .json(new ApiResponse(200,user,"Accounts details successfully"))
+})
+
+const updateUserAvatar=asyncHander(async(req,res)=>{
+  // get avatar from frontent
+  const avatarLocalPath=req.file?.path
+  
+  if(!avatarLocalPath){
+    throw new Apierror(400,"Avatar file is missing")
+  }
+  const avatar=await uploadOnCloudinary(avatarLocalPath)
+
+  if(!avatar.url){
+   throw new Apierror(400,"Error while uploading on avatar")
+  }
+  const user=await User.findByIdAndUpdate(req.user?._id,{
+   $set:{
+    avatar:avatar.url
+   }
+  },{new:true}).select("-password")
+
+  return res.status(200)
+  .json(new ApiResponse(200,user,"Avatar changes successfully"))
+
+})
+
+export 
+{
+   registerUser,
+   loginUser,
+   logoutUser,
+   refreshAccessToken,
+   changeCurrentPassword,
+   getCurrentUser,
+   updateAccountDetails,
+   updateUserAvatar
+}
